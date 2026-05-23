@@ -1,8 +1,10 @@
-// Pint-me — combined top layout (v1)
-// Required before ON: group code + name + duration + radius + location
-// Toggle publishes/unpublishes (no Save button)
-// Matches then optional Meet here below matches
-// No service worker
+// Pint-me — combined top layout (v2)
+// Slider is disabled until Group + Name + Time + Radius are filled.
+// Turning ON triggers location request, then publishes (writes to Firestore).
+// Turning OFF deletes the presence doc.
+// Matches are within YOUR radius.
+// Meet Here is optional and lives below matches.
+// No service worker.
 
 const $ = (id) => document.getElementById(id);
 
@@ -45,25 +47,24 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-const STORAGE_KEY = "pintme_combined_top_v1";
+const STORAGE_KEY = "pintme_combined_top_v2";
 
 const state = {
   on: false,
   duration: 60,
   radiusKm: 1,
-  location: null,     // {lat, lon, accuracy}
+  location: null,   // {lat, lon, accuracy, at}
   savedAt: null,
   expiresAt: null,
   groupCode: "cominghome",
   displayName: "",
   venueName: "",
-  meet: null          // {name, lat, lon, url, createdAt}
+  meet: null        // {name, lat, lon, url, createdAt}
 };
 
 let uid = null;
 let unsub = null;
 let expireTimer = null;
-let uiTickTimer = null;
 let lastToastKey = "";
 
 function persist() {
@@ -75,7 +76,6 @@ function hydrate() {
   if (raw) {
     try { Object.assign(state, JSON.parse(raw)); } catch {}
   }
-
   state.groupCode = (state.groupCode || "cominghome").trim().toLowerCase();
   state.displayName = (state.displayName || "").trim();
   state.venueName = (state.venueName || "").trim();
@@ -89,13 +89,67 @@ function hydrate() {
   }
 }
 
-function requiredReady() {
+function readyForToggle() {
   return !!(
     state.groupCode && state.groupCode.length >= 2 &&
     state.displayName && state.displayName.length >= 1 &&
-    state.duration && state.radiusKm &&
-    state.location
+    state.duration && state.radiusKm
   );
+}
+
+function updateUI() {
+  // Inputs
+  $("groupCode") && ($("groupCode").value = state.groupCode || "");
+  $("displayName") && ($("displayName").value = state.displayName || "");
+  $("duration") && ($("duration").value = String(state.duration));
+  $("radius") && ($("radius").value = String(state.radiusKm));
+  $("venueName") && ($("venueName").value = state.venueName || "");
+
+  // Status chip
+  const chip = $("topStatusChip");
+  if (chip) {
+    chip.textContent = state.on ? "ON" : "OFF";
+    chip.style.borderColor = state.on ? "rgba(93,211,158,.40)" : "rgba(255,255,255,.14)";
+    chip.style.background = state.on ? "rgba(93,211,158,.16)" : "rgba(255,255,255,.06)";
+  }
+
+  // Location display
+  const locEl = $("loc");
+  if (locEl) {
+    locEl.textContent = state.location
+      ? `${state.location.lat.toFixed(5)}, ${state.location.lon.toFixed(5)} (±${Math.round(state.location.accuracy)}m)`
+      : "not set";
+  }
+
+  // Last sync
+  const savedEl = $("saved");
+  if (savedEl) savedEl.textContent = state.savedAt ? new Date(state.savedAt).toLocaleString() : "never";
+
+  // Expiry
+  const expEl = $("expiresText");
+  if (expEl) {
+    if (state.on && state.expiresAt) {
+      const minsLeft = Math.max(0, Math.round((state.expiresAt - Date.now()) / 60000));
+      expEl.textContent = `~${minsLeft} min${minsLeft === 1 ? "" : "s"}`;
+    } else {
+      expEl.textContent = "—";
+    }
+  }
+
+  // Toggle enable/disable
+  const toggle = $("toggleOn");
+  const help = $("pintHelp");
+  if (toggle) {
+    toggle.disabled = !readyForToggle();
+    toggle.checked = !!state.on;
+  }
+  if (help) {
+    help.textContent = readyForToggle()
+      ? (state.on ? "You’re ON. Toggle OFF to disappear." : "Ready. Toggle ON to request location and publish.")
+      : "Fill Group + Name + Time + Radius to enable ON.";
+  }
+
+  renderMeetStatus();
 }
 
 function presenceRef() {
@@ -115,7 +169,7 @@ async function deletePresence() {
 
 async function savePresence() {
   if (!uid) throw new Error("Not signed in yet");
-  if (!requiredReady()) throw new Error("Missing required setup");
+  if (!state.location) throw new Error("Location not set");
 
   const ref = presenceRef();
   if (!ref) throw new Error("Presence ref not available");
@@ -154,7 +208,7 @@ function startRealtime() {
     .collection("presence");
 
   unsub = col.onSnapshot((snap) => {
-    if (!state.on) {
+    if (!state.on || !state.location) {
       renderMatches([]);
       return;
     }
@@ -184,25 +238,12 @@ function startRealtime() {
   }, (err) => console.log("snapshot", err));
 }
 
-function renderMeetStatus() {
-  const status = $("meetStatus");
-  const dot = $("meetDot");
-  if (!status || !dot) return;
-
-  if (state.meet && state.meet.url) {
-    status.textContent = state.meet.name ? `Set: ${state.meet.name}` : "Set";
-    dot.classList.add("on");
-  } else {
-    status.textContent = "Not set";
-    dot.classList.remove("on");
-  }
-}
-
 function renderMatches(matches) {
   const list = $("matchesList");
   const empty = $("matchesEmpty");
   const count = $("matchCount");
   const summary = $("matchSummary");
+
   if (!list || !empty || !count || !summary) return;
 
   const sorted = (matches || []).slice().sort((a, b) => a.dKm - b.dKm);
@@ -223,41 +264,12 @@ function renderMatches(matches) {
     const li = document.createElement("li");
     li.className = "rowcard";
 
-    const meetBlock = (m.meet && m.meet.url)
-      ? `
-        <div class="meetline">
-          <span class="meetpill">📍 <a href="${escapeHtml(m.meet.url)}" target="_blank" rel="noopener">${escapeHtml(m.meet.name || "Meet here")}</a></span>
-          <span class="rowactions">
-            <a class="btn small" href="${escapeHtml(m.meet.url)}" target="_blank" rel="noopener">Open</a>
-            <button class="btn small" data-copy="${escapeHtml(m.meet.url)}">Copy</button>
-          </span>
-        </div>
-      `
-      : `
-        <div class="meetline">
-          <span class="muted" style="font-size:12px">No meet point posted</span>
-        </div>
-      `;
-
     li.innerHTML = `
       <div class="rowtop">
         <div class="name">${escapeHtml(m.name)}</div>
         <div class="dist">~${m.dKm.toFixed(1)} km</div>
       </div>
-      ${meetBlock}
     `;
-
-    li.querySelectorAll("[data-copy]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const url = btn.getAttribute("data-copy");
-        try {
-          await navigator.clipboard.writeText(url);
-          showToast("Copied", "Meet link copied");
-        } catch {
-          showToast("Copy failed", "Long-press to copy the link");
-        }
-      });
-    });
 
     list.appendChild(li);
   });
@@ -270,56 +282,18 @@ function renderMatches(matches) {
   }
 }
 
-function updateUI() {
-  // Inputs
-  if ($("groupCode")) $("groupCode").value = state.groupCode || "";
-  if ($("displayName")) $("displayName").value = state.displayName || "";
-  if ($("duration")) $("duration").value = String(state.duration);
-  if ($("radius")) $("radius").value = String(state.radiusKm);
-  if ($("venueName")) $("venueName").value = state.venueName || "";
+function renderMeetStatus() {
+  const status = $("meetStatus");
+  const dot = $("meetDot");
+  if (!status || !dot) return;
 
-  // Status chip
-  const chip = $("topStatusChip");
-  if (chip) {
-    chip.textContent = state.on ? "ON" : "OFF";
-    chip.style.borderColor = state.on ? "rgba(93,211,158,.40)" : "rgba(255,255,255,.14)";
-    chip.style.background = state.on ? "rgba(93,211,158,.16)" : "rgba(255,255,255,.06)";
+  if (state.meet && state.meet.url) {
+    status.textContent = state.meet.name ? `Set: ${state.meet.name}` : "Set";
+    dot.classList.add("on");
+  } else {
+    status.textContent = "Not set";
+    dot.classList.remove("on");
   }
-
-  // Location display
-  if ($("loc")) {
-    $("loc").textContent = state.location
-      ? `${state.location.lat.toFixed(5)}, ${state.location.lon.toFixed(5)} (±${Math.round(state.location.accuracy)}m)`
-      : "not set";
-  }
-
-  // Last sync
-  if ($("saved")) $("saved").textContent = state.savedAt ? new Date(state.savedAt).toLocaleString() : "never";
-
-  // Expiry display
-  if ($("expiresText")) {
-    if (state.on && state.expiresAt) {
-      const minsLeft = Math.max(0, Math.round((state.expiresAt - Date.now()) / 60000));
-      $("expiresText").textContent = `~${minsLeft} min${minsLeft === 1 ? "" : "s"}`;
-    } else {
-      $("expiresText").textContent = "—";
-    }
-  }
-
-  // Toggle enable/disable
-  const toggle = $("toggleOn");
-  const help = $("pintHelp");
-  if (toggle) {
-    toggle.disabled = !requiredReady();
-    toggle.checked = !!state.on;
-  }
-  if (help) {
-    help.textContent = requiredReady()
-      ? (state.on ? "You’re ON. Toggle OFF to disappear." : "Ready. Switch ON to publish.")
-      : "Fill Group, Name, Time, Radius and set Location to enable ON.";
-  }
-
-  renderMeetStatus();
 }
 
 function scheduleExpiry() {
@@ -333,19 +307,23 @@ function scheduleExpiry() {
   }, ms);
 }
 
-function startUiTicker() {
-  clearInterval(uiTickTimer);
-  uiTickTimer = setInterval(() => {
-    if (state.on && state.expiresAt) updateUI();
-  }, 5000);
+function requestLocation() {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) return reject(new Error("Geolocation not supported."));
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+    );
+  });
 }
 
 async function goOn() {
-  if (!requiredReady()) {
+  if (!readyForToggle()) {
     state.on = false;
     persist();
     updateUI();
-    showToast("Missing setup", "Fill required fields first");
+    showToast("Missing fields", "Fill Group + Name + Time + Radius first");
     return;
   }
 
@@ -354,6 +332,25 @@ async function goOn() {
     persist();
     updateUI();
     showToast("Signing in…", "Try again in 2 seconds");
+    return;
+  }
+
+  // Always fetch/refresh location when turning ON (no separate button)
+  showToast("Getting location…", "Allow location to go ON");
+  try {
+    const pos = await requestLocation();
+    state.location = {
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      at: Date.now()
+    };
+  } catch (err) {
+    console.log(err);
+    state.on = false;
+    persist();
+    updateUI();
+    showToast("Location blocked", "Allow location in browser settings");
     return;
   }
 
@@ -393,7 +390,6 @@ async function goOff(fromExpiry = false) {
 }
 
 function wireUI() {
-  // Inputs
   $("groupCode")?.addEventListener("input", (e) => {
     state.groupCode = (e.target.value || "").trim().toLowerCase();
     persist();
@@ -410,38 +406,16 @@ function wireUI() {
     state.duration = Number(e.target.value);
     persist();
     updateUI();
-    if (state.on) await goOn(); // refresh expiry/presence
+    if (state.on) await goOn(); // refresh presence + expiry (will re-request location)
   });
 
   $("radius")?.addEventListener("change", (e) => {
     state.radiusKm = Number(e.target.value);
     persist();
     updateUI();
-    if (state.on) startRealtime(); // refilter matches
+    if (state.on) startRealtime();
   });
 
-  // Location (required)
-  $("getLocation")?.addEventListener("click", () => {
-    if (!("geolocation" in navigator)) return alert("Geolocation not supported.");
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        state.location = {
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-          accuracy: pos.coords.accuracy
-        };
-        persist();
-        updateUI();
-        showToast("Location set", "You can now switch ON");
-        if (state.on) startRealtime();
-      },
-      (err) => alert(`Couldn’t get location: ${err.message}`),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
-  });
-
-  // Toggle publishes/unpublishes
   $("toggleOn")?.addEventListener("change", async (e) => {
     const wantOn = e.target.checked;
     state.on = wantOn;
@@ -461,7 +435,7 @@ function wireUI() {
 
   $("meetHere")?.addEventListener("click", async () => {
     if (!state.on) return showToast("Turn ON first", "Meet here only posts while you’re ON");
-    if (!state.location) return showToast("No location", "Set location first");
+    if (!state.location) return showToast("No location", "Turn ON again to refresh location");
     if (!uid) return showToast("Signing in…", "Try again in 2 seconds");
 
     const name = (state.venueName || "").trim();
@@ -507,8 +481,8 @@ async function initFirebaseAuth() {
       // If OFF, ensure no lingering doc
       if (!state.on) await deletePresence();
 
-      // If ON, publish immediately (e.g. page refresh)
-      if (state.on) {
+      // If ON (page refresh), re-publish only if we still have a location
+      if (state.on && state.location) {
         try { await savePresence(); } catch {}
         startRealtime();
         scheduleExpiry();
@@ -529,4 +503,3 @@ hydrate();
 wireUI();
 updateUI();
 initFirebaseAuth();
-startUiTicker();
