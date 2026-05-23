@@ -55,6 +55,11 @@ input:focus,select:focus{border-color:rgba(106,169,255,.55);background:rgba(0,0,
 
 .meta{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px}
 .metaRow{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px;margin-top:6px}
+.tappable { cursor: pointer; }
+.tappable:hover { background: rgba(255,255,255,.04); border-radius: 12px; }
+.tappable:active { transform: scale(.99); }
+.tappable { padding: 8px 8px; margin: -8px -8px 0; }
+
 .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;color: rgba(238,242,255,.92)}
 
 .chip{padding:7px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);font-size:12px;font-weight:900;letter-spacing:.3px}
