@@ -96,8 +96,29 @@ input:checked + .slider{background:rgba(106,169,255,.25);border-color:rgba(106,1
 input:checked + .slider:before{transform:translateX(24px)}
 input[disabled] + .slider{opacity:.5;cursor:not-allowed}
 
-@media (max-width:560px){
+/* Keep 2 columns on most phones; only stack on very small screens */
+@media (max-width:360px){
   .grid2{grid-template-columns:1fr}
+}
+
+/* Buttons still stack on phones (usually nicer) */
+@media (max-width:560px){
   .actions{grid-template-columns:1fr}
   .footerActions{grid-template-columns:1fr}
 }
+
+
+/* Better 2-col fit on phones */
+.grid2{
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 10px;
+}
+
+select, input{
+  width: 100%;
+  min-width: 0;
+  font-size: 16px; /* IMPORTANT: prevents iOS zoom on focus */
+  padding: 11px 12px;
+}
+label{ min-width: 0; }
+``
