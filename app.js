@@ -522,3 +522,54 @@ function wireUI() {
 
   $("share").addEventListener("click", async () => {
     const url = location.href;
+    const text = `Pint-me — join my group code: ${state.groupCode}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Pint-me", text, url });
+      else {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        showToast("Invite copied", "Paste it into WhatsApp/iMessage");
+      }
+    } catch {}
+  });
+
+  $("reset").addEventListener("click", async () => {
+    if (!confirm("Reset everything on this device?")) return;
+    stopRealtime();
+    state.meet = null;
+    if (uid) await deletePresence();
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  });
+}
+
+async function initFirebaseAuth() {
+  const { auth } = window.fb;
+
+  auth.onAuthStateChanged(async (user) => {
+    if (user) {
+      uid = user.uid;
+
+      // Ensure OFF users aren't lingering
+      if (!state.on) await deletePresence();
+
+      // If ON, publish immediately
+      if (state.on) {
+        try { await savePresence(); } catch {}
+        startRealtime();
+      }
+
+      render();
+    }
+  });
+
+  if (!auth.currentUser) {
+    try { await auth.signInAnonymously(); }
+    catch (e) { alert("Firebase auth error: " + e.message); }
+  }
+}
+
+// Boot
+hydrate();
+wireUI();
+render();
+initFirebaseAuth();
