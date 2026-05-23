@@ -1,8 +1,8 @@
-// Pint-me — layout v3
-// Required: group code + display name + location.
-// Toggle publishes/unpublishes (no Save button).
-// Matches first, Meet here optional below matches.
-// No service worker.
+// Pint-me — combined top layout (v1)
+// Required before ON: group code + name + duration + radius + location
+// Toggle publishes/unpublishes (no Save button)
+// Matches then optional Meet here below matches
+// No service worker
 
 const $ = (id) => document.getElementById(id);
 
@@ -45,26 +45,26 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-const STORAGE_KEY = "pintme_layout_v3";
+const STORAGE_KEY = "pintme_combined_top_v1";
 
 const state = {
   on: false,
   duration: 60,
   radiusKm: 1,
-  location: null, // {lat, lon, accuracy}
+  location: null,     // {lat, lon, accuracy}
   savedAt: null,
   expiresAt: null,
   groupCode: "cominghome",
   displayName: "",
-  showAllInGroup: false,
   venueName: "",
-  meet: null // {name, lat, lon, url, createdAt}
+  meet: null          // {name, lat, lon, url, createdAt}
 };
 
 let uid = null;
-let unsubscribe = null;
+let unsub = null;
+let expireTimer = null;
+let uiTickTimer = null;
 let lastToastKey = "";
-let updateTimer = null;
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -78,10 +78,9 @@ function hydrate() {
 
   state.groupCode = (state.groupCode || "cominghome").trim().toLowerCase();
   state.displayName = (state.displayName || "").trim();
-  state.showAllInGroup = !!state.showAllInGroup;
   state.venueName = (state.venueName || "").trim();
 
-  // auto-expire local state
+  // local auto-expire
   if (state.expiresAt && Date.now() > state.expiresAt) {
     state.on = false;
     state.expiresAt = null;
@@ -94,24 +93,9 @@ function requiredReady() {
   return !!(
     state.groupCode && state.groupCode.length >= 2 &&
     state.displayName && state.displayName.length >= 1 &&
-    state.location &&
-    state.duration && state.radiusKm
+    state.duration && state.radiusKm &&
+    state.location
   );
-}
-
-function updateToggleEnabled() {
-  const ok = requiredReady();
-  const toggle = $("toggleOn");
-  const help = $("pintHelp");
-
-  if (!toggle) return;
-
-  toggle.disabled = !ok;
-
-  if (help) {
-    if (!ok) help.textContent = "Enter Group + Name and set Location to enable ON.";
-    else help.textContent = state.on ? "You’re ON. Toggle OFF to disappear." : "Ready. Switch ON to publish.";
-  }
 }
 
 function presenceRef() {
@@ -157,7 +141,7 @@ async function savePresence() {
 }
 
 function stopRealtime() {
-  if (unsubscribe) { try { unsubscribe(); } catch {} unsubscribe = null; }
+  if (unsub) { try { unsub(); } catch {} unsub = null; }
 }
 
 function startRealtime() {
@@ -169,7 +153,7 @@ function startRealtime() {
     .doc(state.groupCode)
     .collection("presence");
 
-  unsubscribe = col.onSnapshot((snap) => {
+  unsub = col.onSnapshot((snap) => {
     if (!state.on) {
       renderMatches([]);
       return;
@@ -191,8 +175,7 @@ function startRealtime() {
         p.location.lat, p.location.lon
       );
 
-      const within = dKm <= state.radiusKm;
-      if (state.showAllInGroup || within) {
+      if (dKm <= state.radiusKm) {
         others.push({ name: p.name, dKm, meet: p.meet || null });
       }
     });
@@ -220,31 +203,27 @@ function renderMatches(matches) {
   const empty = $("matchesEmpty");
   const count = $("matchCount");
   const summary = $("matchSummary");
-
   if (!list || !empty || !count || !summary) return;
 
   const sorted = (matches || []).slice().sort((a, b) => a.dKm - b.dKm);
-
   count.textContent = String(sorted.length);
   list.innerHTML = "";
 
   if (sorted.length === 0) {
     empty.style.display = "block";
-    summary.textContent = state.on ? "No matches yet." : "Turn ON to see who’s up for one.";
+    summary.textContent = state.on ? "No matches yet." : "Turn ON to see who’s up for one nearby.";
     lastToastKey = "";
     return;
   }
 
   empty.style.display = "none";
-  summary.textContent = state.showAllInGroup
-    ? `${sorted.length} ON in group.`
-    : `${sorted.length} match${sorted.length === 1 ? "" : "es"} in radius.`;
+  summary.textContent = `${sorted.length} match${sorted.length === 1 ? "" : "es"} in radius.`;
 
   sorted.forEach((m) => {
     const li = document.createElement("li");
     li.className = "rowcard";
 
-    const meet = (m.meet && m.meet.url)
+    const meetBlock = (m.meet && m.meet.url)
       ? `
         <div class="meetline">
           <span class="meetpill">📍 <a href="${escapeHtml(m.meet.url)}" target="_blank" rel="noopener">${escapeHtml(m.meet.name || "Meet here")}</a></span>
@@ -265,7 +244,7 @@ function renderMatches(matches) {
         <div class="name">${escapeHtml(m.name)}</div>
         <div class="dist">~${m.dKm.toFixed(1)} km</div>
       </div>
-      ${meet}
+      ${meetBlock}
     `;
 
     li.querySelectorAll("[data-copy]").forEach((btn) => {
@@ -284,24 +263,22 @@ function renderMatches(matches) {
   });
 
   const top = sorted[0];
-  const key = `${top.name}|${top.dKm.toFixed(1)}|${state.groupCode}|${state.showAllInGroup ? 1 : 0}|${state.radiusKm}`;
+  const key = `${top.name}|${top.dKm.toFixed(1)}|${state.groupCode}|${state.radiusKm}`;
   if (key !== lastToastKey) {
     lastToastKey = key;
     showToast(`🍺 Match: ${top.name}`, `~${top.dKm.toFixed(1)} km away • ${state.groupCode}`);
   }
 }
 
-function render() {
-  $("duration").value = String(state.duration);
-  $("radius").value = String(state.radiusKm);
-  $("groupCode").value = state.groupCode || "";
-  $("displayName").value = state.displayName || "";
-  $("showAllInGroup").checked = !!state.showAllInGroup;
-  $("venueName").value = state.venueName || "";
+function updateUI() {
+  // Inputs
+  if ($("groupCode")) $("groupCode").value = state.groupCode || "";
+  if ($("displayName")) $("displayName").value = state.displayName || "";
+  if ($("duration")) $("duration").value = String(state.duration);
+  if ($("radius")) $("radius").value = String(state.radiusKm);
+  if ($("venueName")) $("venueName").value = state.venueName || "";
 
-  const toggle = $("toggleOn");
-  if (toggle) toggle.checked = !!state.on;
-
+  // Status chip
   const chip = $("topStatusChip");
   if (chip) {
     chip.textContent = state.on ? "ON" : "OFF";
@@ -309,91 +286,142 @@ function render() {
     chip.style.background = state.on ? "rgba(93,211,158,.16)" : "rgba(255,255,255,.06)";
   }
 
-  const gc = $("groupChip");
-  if (gc) gc.textContent = state.groupCode || "";
+  // Location display
+  if ($("loc")) {
+    $("loc").textContent = state.location
+      ? `${state.location.lat.toFixed(5)}, ${state.location.lon.toFixed(5)} (±${Math.round(state.location.accuracy)}m)`
+      : "not set";
+  }
 
-  $("loc").textContent = state.location
-    ? `${state.location.lat.toFixed(5)}, ${state.location.lon.toFixed(5)} (±${Math.round(state.location.accuracy)}m)`
-    : "not set";
+  // Last sync
+  if ($("saved")) $("saved").textContent = state.savedAt ? new Date(state.savedAt).toLocaleString() : "never";
 
-  $("saved").textContent = state.savedAt ? new Date(state.savedAt).toLocaleString() : "never";
+  // Expiry display
+  if ($("expiresText")) {
+    if (state.on && state.expiresAt) {
+      const minsLeft = Math.max(0, Math.round((state.expiresAt - Date.now()) / 60000));
+      $("expiresText").textContent = `~${minsLeft} min${minsLeft === 1 ? "" : "s"}`;
+    } else {
+      $("expiresText").textContent = "—";
+    }
+  }
 
-  if (state.on && state.expiresAt) {
-    const minsLeft = Math.max(0, Math.round((state.expiresAt - Date.now()) / 60000));
-    $("expiresText").textContent = `~${minsLeft} min${minsLeft === 1 ? "" : "s"}`;
-  } else {
-    $("expiresText").textContent = "—";
+  // Toggle enable/disable
+  const toggle = $("toggleOn");
+  const help = $("pintHelp");
+  if (toggle) {
+    toggle.disabled = !requiredReady();
+    toggle.checked = !!state.on;
+  }
+  if (help) {
+    help.textContent = requiredReady()
+      ? (state.on ? "You’re ON. Toggle OFF to disappear." : "Ready. Switch ON to publish.")
+      : "Fill Group, Name, Time, Radius and set Location to enable ON.";
   }
 
   renderMeetStatus();
-  updateToggleEnabled();
 }
 
-function scheduleUpdateIfOn() {
-  if (!state.on) return;
-  clearTimeout(updateTimer);
-  updateTimer = setTimeout(async () => {
-    try {
-      state.savedAt = Date.now();
-      state.expiresAt = Date.now() + state.duration * 60000;
-      persist();
-      await savePresence();
-      render();
-    } catch (e) {
-      console.log(e);
-    }
-  }, 250);
+function scheduleExpiry() {
+  clearTimeout(expireTimer);
+  if (!state.on || !state.expiresAt) return;
+
+  const ms = Math.max(0, state.expiresAt - Date.now() + 1000);
+  expireTimer = setTimeout(async () => {
+    await goOff(true);
+    showToast("Expired", "You’re now OFF");
+  }, ms);
+}
+
+function startUiTicker() {
+  clearInterval(uiTickTimer);
+  uiTickTimer = setInterval(() => {
+    if (state.on && state.expiresAt) updateUI();
+  }, 5000);
+}
+
+async function goOn() {
+  if (!requiredReady()) {
+    state.on = false;
+    persist();
+    updateUI();
+    showToast("Missing setup", "Fill required fields first");
+    return;
+  }
+
+  if (!uid) {
+    state.on = false;
+    persist();
+    updateUI();
+    showToast("Signing in…", "Try again in 2 seconds");
+    return;
+  }
+
+  state.savedAt = Date.now();
+  state.expiresAt = Date.now() + state.duration * 60000;
+  persist();
+  updateUI();
+
+  try {
+    await savePresence();
+    startRealtime();
+    scheduleExpiry();
+    showToast("You’re ON", "Visible to your group");
+  } catch (e) {
+    console.log(e);
+    state.on = false;
+    state.expiresAt = null;
+    persist();
+    updateUI();
+    showToast("Couldn’t go ON", "Check Firebase rules/auth");
+  }
+}
+
+async function goOff(fromExpiry = false) {
+  state.on = false;
+  state.expiresAt = null;
+  state.meet = null;
+  state.savedAt = Date.now();
+  persist();
+  updateUI();
+
+  stopRealtime();
+  await deletePresence();
+  renderMatches([]);
+
+  if (!fromExpiry) showToast("You’re OFF", "Removed from matches");
 }
 
 function wireUI() {
-  $("groupCode").addEventListener("input", (e) => {
-    const newCode = (e.target.value || "").trim().toLowerCase();
-    if (newCode !== state.groupCode) {
-      state.groupCode = newCode;
-      persist();
-      render();
-
-      if (state.on && uid) {
-        deletePresence().finally(() => {
-          stopRealtime();
-          scheduleUpdateIfOn();
-          startRealtime();
-        });
-      }
-    }
+  // Inputs
+  $("groupCode")?.addEventListener("input", (e) => {
+    state.groupCode = (e.target.value || "").trim().toLowerCase();
+    persist();
+    updateUI();
   });
 
-  $("displayName").addEventListener("input", (e) => {
+  $("displayName")?.addEventListener("input", (e) => {
     state.displayName = (e.target.value || "").trim();
     persist();
-    render();
-    scheduleUpdateIfOn();
+    updateUI();
   });
 
-  $("showAllInGroup").addEventListener("change", (e) => {
-    state.showAllInGroup = !!e.target.checked;
-    persist();
-    render();
-    startRealtime();
-  });
-
-  $("duration").addEventListener("change", (e) => {
+  $("duration")?.addEventListener("change", async (e) => {
     state.duration = Number(e.target.value);
-    if (state.on) state.expiresAt = Date.now() + state.duration * 60000;
     persist();
-    render();
-    scheduleUpdateIfOn();
+    updateUI();
+    if (state.on) await goOn(); // refresh expiry/presence
   });
 
-  $("radius").addEventListener("change", (e) => {
+  $("radius")?.addEventListener("change", (e) => {
     state.radiusKm = Number(e.target.value);
     persist();
-    render();
-    startRealtime();
-    scheduleUpdateIfOn();
+    updateUI();
+    if (state.on) startRealtime(); // refilter matches
   });
 
-  $("getLocation").addEventListener("click", () => {
+  // Location (required)
+  $("getLocation")?.addEventListener("click", () => {
     if (!("geolocation" in navigator)) return alert("Geolocation not supported.");
 
     navigator.geolocation.getCurrentPosition(
@@ -404,10 +432,9 @@ function wireUI() {
           accuracy: pos.coords.accuracy
         };
         persist();
-        render();
+        updateUI();
         showToast("Location set", "You can now switch ON");
-        startRealtime();
-        scheduleUpdateIfOn();
+        if (state.on) startRealtime();
       },
       (err) => alert(`Couldn’t get location: ${err.message}`),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
@@ -415,78 +442,27 @@ function wireUI() {
   });
 
   // Toggle publishes/unpublishes
-  $("toggleOn").addEventListener("change", async (e) => {
+  $("toggleOn")?.addEventListener("change", async (e) => {
     const wantOn = e.target.checked;
-
-    if (!requiredReady()) {
-      e.target.checked = false;
-      showToast("Missing setup", "Group + Name + Location are required");
-      return;
-    }
-
     state.on = wantOn;
-    state.expiresAt = wantOn ? Date.now() + state.duration * 60000 : null;
-    if (!wantOn) state.meet = null;
-    state.savedAt = Date.now();
     persist();
-    render();
+    updateUI();
 
-    if (!uid) {
-      showToast("Signing in…", "Try again in 2 seconds");
-      state.on = false;
-      state.expiresAt = null;
-      persist();
-      render();
-      return;
-    }
-
-    if (!wantOn) {
-      stopRealtime();
-      await deletePresence();
-      renderMatches([]);
-      showToast("You’re OFF", "Removed from matches");
-      return;
-    }
-
-    try {
-      await savePresence();
-      showToast("You’re ON", "Visible to your group");
-      startRealtime();
-
-      clearTimeout(window.__expireTimer);
-      window.__expireTimer = setTimeout(async () => {
-        state.on = false;
-        state.expiresAt = null;
-        state.meet = null;
-        state.savedAt = Date.now();
-        persist();
-        render();
-        stopRealtime();
-        await deletePresence();
-        renderMatches([]);
-        showToast("Expired", "You’re now OFF");
-      }, state.duration * 60000 + 1000);
-    } catch (err) {
-      console.log(err);
-      showToast("Couldn’t go ON", "Check Firebase rules/auth");
-      state.on = false;
-      state.expiresAt = null;
-      persist();
-      render();
-    }
+    if (wantOn) await goOn();
+    else await goOff(false);
   });
 
-  // Meet here (optional)
-  $("venueName").addEventListener("input", (e) => {
+  // Meet Here (optional)
+  $("venueName")?.addEventListener("input", (e) => {
     state.venueName = (e.target.value || "").trim();
     persist();
-    render();
+    updateUI();
   });
 
-  $("meetHere").addEventListener("click", async () => {
+  $("meetHere")?.addEventListener("click", async () => {
     if (!state.on) return showToast("Turn ON first", "Meet here only posts while you’re ON");
     if (!state.location) return showToast("No location", "Set location first");
-    if (!uid) return showToast("Signing you in…", "Try again in 2 seconds");
+    if (!uid) return showToast("Signing in…", "Try again in 2 seconds");
 
     const name = (state.venueName || "").trim();
     const lat = state.location.lat;
@@ -496,49 +472,28 @@ function wireUI() {
     state.meet = { name: name || "Meet here", lat, lon, url, createdAt: Date.now() };
     state.savedAt = Date.now();
     persist();
-    render();
+    updateUI();
 
     try {
       await savePresence();
       showToast("Meet posted", name ? name : "Pin added");
-    } catch (e) {
-      console.log(e);
+    } catch (e2) {
+      console.log(e2);
       showToast("Meet failed", "Couldn’t update Firebase");
     }
   });
 
-  $("clearMeet").addEventListener("click", async () => {
+  $("clearMeet")?.addEventListener("click", async () => {
     state.meet = null;
     state.savedAt = Date.now();
     persist();
-    render();
+    updateUI();
 
     if (state.on && uid) {
       try { await savePresence(); showToast("Cleared", "Meet removed"); } catch {}
     } else {
       showToast("Cleared", "Meet removed");
     }
-  });
-
-  $("share").addEventListener("click", async () => {
-    const url = location.href;
-    const text = `Pint-me — join my group code: ${state.groupCode}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Pint-me", text, url });
-      else {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
-        showToast("Invite copied", "Paste it into WhatsApp/iMessage");
-      }
-    } catch {}
-  });
-
-  $("reset").addEventListener("click", async () => {
-    if (!confirm("Reset everything on this device?")) return;
-    stopRealtime();
-    state.meet = null;
-    if (uid) await deletePresence();
-    localStorage.removeItem(STORAGE_KEY);
-    location.reload();
   });
 }
 
@@ -549,16 +504,17 @@ async function initFirebaseAuth() {
     if (user) {
       uid = user.uid;
 
-      // Ensure OFF users aren't lingering
+      // If OFF, ensure no lingering doc
       if (!state.on) await deletePresence();
 
-      // If ON, publish immediately
+      // If ON, publish immediately (e.g. page refresh)
       if (state.on) {
         try { await savePresence(); } catch {}
         startRealtime();
+        scheduleExpiry();
       }
 
-      render();
+      updateUI();
     }
   });
 
@@ -571,5 +527,6 @@ async function initFirebaseAuth() {
 // Boot
 hydrate();
 wireUI();
-render();
+updateUI();
 initFirebaseAuth();
+startUiTicker();
