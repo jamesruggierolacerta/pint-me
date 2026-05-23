@@ -1,7 +1,8 @@
 // Pint-me — layout v3
 // Required: group code + display name + location.
 // Toggle publishes/unpublishes (no Save button).
-// Meet here is optional and sits below matches.
+// Matches first, Meet here optional below matches.
+// No service worker.
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,14 +12,16 @@ function escapeHtml(s) {
     "<": "&lt;",
     ">": "&gt;",
     "'": "&#39;",
-    """: "&quot;"
+    "\"": "&quot;"
   }[c]));
 }
 
 function showToast(title, subtitle = "", ms = 4500) {
   const el = $("toast");
   if (!el) return;
-  el.innerHTML = subtitle ? `${escapeHtml(title)}<small>${escapeHtml(subtitle)}</small>` : escapeHtml(title);
+  el.innerHTML = subtitle
+    ? `${escapeHtml(title)}<small>${escapeHtml(subtitle)}</small>`
+    : escapeHtml(title);
   el.classList.add("show");
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(() => el.classList.remove("show"), ms);
@@ -29,20 +32,33 @@ function mapsLink(lat, lon, label) {
   return `https://www.google.com/maps?q=${encodeURIComponent(q)}`;
 }
 
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 const STORAGE_KEY = "pintme_layout_v3";
 
 const state = {
   on: false,
   duration: 60,
   radiusKm: 1,
-  location: null,
+  location: null, // {lat, lon, accuracy}
   savedAt: null,
   expiresAt: null,
   groupCode: "cominghome",
   displayName: "",
   showAllInGroup: false,
   venueName: "",
-  meet: null
+  meet: null // {name, lat, lon, url, createdAt}
 };
 
 let uid = null;
@@ -59,11 +75,13 @@ function hydrate() {
   if (raw) {
     try { Object.assign(state, JSON.parse(raw)); } catch {}
   }
+
   state.groupCode = (state.groupCode || "cominghome").trim().toLowerCase();
   state.displayName = (state.displayName || "").trim();
   state.showAllInGroup = !!state.showAllInGroup;
   state.venueName = (state.venueName || "").trim();
 
+  // auto-expire local state
   if (state.expiresAt && Date.now() > state.expiresAt) {
     state.on = false;
     state.expiresAt = null;
@@ -77,8 +95,7 @@ function requiredReady() {
     state.groupCode && state.groupCode.length >= 2 &&
     state.displayName && state.displayName.length >= 1 &&
     state.location &&
-    state.duration &&
-    state.radiusKm
+    state.duration && state.radiusKm
   );
 }
 
@@ -92,14 +109,18 @@ function updateToggleEnabled() {
   toggle.disabled = !ok;
 
   if (help) {
-    if (ok) help.textContent = state.on ? "You’re ON. Toggle OFF to disappear." : "Ready. Switch ON to publish.";
-    else help.textContent = "Enter Group + Name and set Location to enable ON.";
+    if (!ok) help.textContent = "Enter Group + Name and set Location to enable ON.";
+    else help.textContent = state.on ? "You’re ON. Toggle OFF to disappear." : "Ready. Switch ON to publish.";
   }
 }
 
 function presenceRef() {
   if (!uid || !state.groupCode) return null;
-  return window.fb.db.collection("groups").doc(state.groupCode).collection("presence").doc(uid);
+  return window.fb.db
+    .collection("groups")
+    .doc(state.groupCode)
+    .collection("presence")
+    .doc(uid);
 }
 
 async function deletePresence() {
@@ -121,7 +142,11 @@ async function savePresence() {
     on: true,
     duration: state.duration,
     radiusKm: state.radiusKm,
-    location: { lat: state.location.lat, lon: state.location.lon, accuracy: state.location.accuracy },
+    location: {
+      lat: state.location.lat,
+      lon: state.location.lon,
+      accuracy: state.location.accuracy
+    },
     savedAt: state.savedAt || Date.now(),
     expiresAt: state.expiresAt || (Date.now() + state.duration * 60000),
     updatedAt: Date.now(),
@@ -139,7 +164,11 @@ function startRealtime() {
   stopRealtime();
   if (!uid || !state.groupCode) return;
 
-  const col = window.fb.db.collection("groups").doc(state.groupCode).collection("presence");
+  const col = window.fb.db
+    .collection("groups")
+    .doc(state.groupCode)
+    .collection("presence");
+
   unsubscribe = col.onSnapshot((snap) => {
     if (!state.on) {
       renderMatches([]);
@@ -157,9 +186,12 @@ function startRealtime() {
       if (p.expiresAt && p.expiresAt < now) return;
       if (!p.location) return;
 
-      const dKm = haversineKm(state.location.lat, state.location.lon, p.location.lat, p.location.lon);
-      const within = dKm <= state.radiusKm;
+      const dKm = haversineKm(
+        state.location.lat, state.location.lon,
+        p.location.lat, p.location.lon
+      );
 
+      const within = dKm <= state.radiusKm;
       if (state.showAllInGroup || within) {
         others.push({ name: p.name, dKm, meet: p.meet || null });
       }
@@ -192,6 +224,7 @@ function renderMatches(matches) {
   if (!list || !empty || !count || !summary) return;
 
   const sorted = (matches || []).slice().sort((a, b) => a.dKm - b.dKm);
+
   count.textContent = String(sorted.length);
   list.innerHTML = "";
 
@@ -309,7 +342,7 @@ function scheduleUpdateIfOn() {
     } catch (e) {
       console.log(e);
     }
-  }, 300);
+  }, 250);
 }
 
 function wireUI() {
@@ -319,7 +352,8 @@ function wireUI() {
       state.groupCode = newCode;
       persist();
       render();
-      if (state.on) {
+
+      if (state.on && uid) {
         deletePresence().finally(() => {
           stopRealtime();
           scheduleUpdateIfOn();
@@ -364,21 +398,23 @@ function wireUI() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        state.location = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        state.location = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        };
         persist();
         render();
         showToast("Location set", "You can now switch ON");
         startRealtime();
         scheduleUpdateIfOn();
       },
-      (err) => {
-        // Common iOS failure is permission blocked or not https.
-        alert(`Couldn’t get location: ${err.message}`);
-      },
+      (err) => alert(`Couldn’t get location: ${err.message}`),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   });
 
+  // Toggle publishes/unpublishes
   $("toggleOn").addEventListener("change", async (e) => {
     const wantOn = e.target.checked;
 
@@ -414,7 +450,7 @@ function wireUI() {
 
     try {
       await savePresence();
-      showToast("You’re ON", "Visible to your group" );
+      showToast("You’re ON", "Visible to your group");
       startRealtime();
 
       clearTimeout(window.__expireTimer);
@@ -430,7 +466,6 @@ function wireUI() {
         renderMatches([]);
         showToast("Expired", "You’re now OFF");
       }, state.duration * 60000 + 1000);
-
     } catch (err) {
       console.log(err);
       showToast("Couldn’t go ON", "Check Firebase rules/auth");
@@ -441,7 +476,7 @@ function wireUI() {
     }
   });
 
-  // meet here optional
+  // Meet here (optional)
   $("venueName").addEventListener("input", (e) => {
     state.venueName = (e.target.value || "").trim();
     persist();
@@ -487,60 +522,3 @@ function wireUI() {
 
   $("share").addEventListener("click", async () => {
     const url = location.href;
-    const text = `Pint-me — join my group code: ${state.groupCode}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Pint-me", text, url });
-      else {
-        await navigator.clipboard.writeText(`${text}
-${url}`);
-        showToast("Invite copied", "Paste it into WhatsApp/iMessage");
-      }
-    } catch {}
-  });
-
-  $("reset").addEventListener("click", async () => {
-    if (!confirm("Reset everything on this device?")) return;
-    stopRealtime();
-    state.meet = null;
-    if (uid) await deletePresence();
-    localStorage.removeItem(STORAGE_KEY);
-    location.reload();
-  });
-}
-
-async function initFirebaseAuth() {
-  const { auth } = window.fb;
-
-  auth.onAuthStateChanged(async (user) => {
-    if (user) {
-      uid = user.uid;
-      if (!state.on) await deletePresence();
-      if (state.on) {
-        try { await savePresence(); } catch {}
-        startRealtime();
-      }
-      render();
-    }
-  });
-
-  if (!auth.currentUser) {
-    try { await auth.signInAnonymously(); }
-    catch (e) { alert("Firebase auth error: " + e.message); }
-  }
-}
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-// Boot
-hydrate();
-wireUI();
-render();
-initFirebaseAuth();
