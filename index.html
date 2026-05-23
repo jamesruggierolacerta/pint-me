@@ -26,14 +26,43 @@
     <div id="toast" class="toast" aria-live="polite"></div>
 
     <main class="content">
+
+      <!-- 1) Identity + group first -->
+      <section class="card">
+        <div class="cardhead">
+          <div>
+            <div class="cardtitle">Your details</div>
+            <div class="cardsub">These are required before you can go ON.</div>
+          </div>
+          <div class="chip" id="groupChip">cominghome</div>
+        </div>
+
+        <div class="grid2">
+          <label>
+            Group code
+            <input id="groupCode" placeholder="e.g. cominghome" />
+          </label>
+          <label>
+            Display name
+            <input id="displayName" placeholder="e.g. James" />
+          </label>
+        </div>
+
+        <label class="check">
+          <input id="showAllInGroup" type="checkbox" />
+          <span>Show all ON in group (ignore radius)</span>
+        </label>
+      </section>
+
+      <!-- 2) Pint mode: duration, radius, optional location, then toggle ON -->
       <section class="card">
         <div class="cardhead">
           <div>
             <div class="cardtitle">I’m up for a pint</div>
-            <div id="expiresText" class="cardsub"></div>
+            <div id="pintHelp" class="cardsub">Fill required fields above, then switch ON.</div>
           </div>
           <label class="switch" aria-label="Toggle pint mode">
-            <input id="toggleOn" type="checkbox" />
+            <input id="toggleOn" type="checkbox" disabled />
             <span class="slider"></span>
           </label>
         </div>
@@ -60,48 +89,18 @@
           </label>
         </div>
 
-        <div class="actions">
-          <button id="getLocation" class="btn">📍 Use my location</button>
-          <button id="save" class="btn primary">✅ Save status</button>
+        <div class="actions single">
+          <button id="getLocation" class="btn">📍 Set location (optional)</button>
         </div>
 
         <div class="meta">
           <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
-          <div class="metaRow"><span>Last saved</span><span id="saved" class="mono">never</span></div>
+          <div class="metaRow"><span>Status expiry</span><span id="expiresText" class="mono">—</span></div>
+          <div class="metaRow"><span>Last sync</span><span id="saved" class="mono">never</span></div>
         </div>
       </section>
 
-      <section class="card">
-        <div class="cardhead">
-          <div>
-            <div class="cardtitle">Your details</div>
-            <div class="cardsub">Same group code = same pool.</div>
-          </div>
-          <div class="chip" id="groupChip">cominghome</div>
-        </div>
-
-        <div class="grid2">
-          <label>
-            Group code
-            <input id="groupCode" placeholder="e.g. cominghome" />
-          </label>
-          <label>
-            Display name
-            <input id="displayName" placeholder="e.g. James" />
-          </label>
-        </div>
-
-        <label class="check">
-          <input id="showAllInGroup" type="checkbox" />
-          <span>Show all ON in group (ignore radius)</span>
-        </label>
-
-        <div class="actions">
-          <button id="share" class="btn">↗️ Share invite</button>
-          <button id="reset" class="btn danger">🧹 Reset</button>
-        </div>
-      </section>
-
+      <!-- Meet here stays but now relies on being ON -->
       <section class="card">
         <div class="cardhead">
           <div>
@@ -122,11 +121,12 @@
         </div>
       </section>
 
+      <!-- 3) Matches at bottom -->
       <section class="card">
         <div class="cardhead">
           <div>
             <div class="cardtitle">Matches</div>
-            <div id="matchSummary" class="cardsub">Turn ON + Save status to see matches.</div>
+            <div id="matchSummary" class="cardsub">Turn ON to see who’s up for one.</div>
           </div>
           <div class="chip" id="matchCount">0</div>
         </div>
@@ -134,8 +134,14 @@
         <div id="matchesEmpty" class="empty">No matches yet.</div>
         <ul id="matchesList" class="list"></ul>
 
-        <div class="footerNote">Version: clean-stylish-v1 • realtime • meet-here • no-sw</div>
+        <div class="footerActions">
+          <button id="share" class="btn">↗️ Share invite</button>
+          <button id="reset" class="btn danger">🧹 Reset</button>
+        </div>
+
+        <div class="footerNote">Version: layout-v2 • toggle-to-publish • no-sw</div>
       </section>
+
     </main>
   </div>
 
@@ -144,10 +150,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-  <!-- Firebase config -->
   <script src="firebase-init.js"></script>
-
-  <!-- App code -->
   <script src="app.js"></script>
 </body>
 </html>

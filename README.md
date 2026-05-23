@@ -1,18 +1,20 @@
-# Pint-me — Clean rebuild (no service worker)
+# Pint-me — Layout v2
 
-This is a fresh rebuild to avoid the "buttons don't work" issue caused by HTML-escaped JavaScript.
+This layout matches your requested flow:
 
-## Upload to GitHub Pages
+1) Group code + Display name at the top
+2) Pint section (duration, radius, optional location)
+3) **No Save button**: the **toggle switch publishes** when required fields are filled
+4) Matches below
 
-1. Create a repo (e.g. `Pint-me`)
-2. Upload the contents of this folder to the **repo root** (so `index.html` is in the root)
-3. Enable GitHub Pages: Settings → Pages → Deploy from branch → `main` / `/ (root)`
+### Notes
+- Location is optional. If you don't set it, you can still go ON, but distance filtering requires location.
+- Turning OFF deletes your presence doc immediately.
+- No service worker is included (avoids caching issues while iterating).
 
 ## Firebase checklist
-
-1) Firebase Console → Authentication → Sign-in method → enable **Anonymous**
-
-2) Firestore → Rules:
+- Enable Anonymous auth
+- Firestore rules:
 
 ```js
 rules_version = '2';
@@ -25,9 +27,3 @@ service cloud.firestore {
   }
 }
 ```
-
-## Notes
-
-- Default group code is `cominghome`.
-- Turning OFF / Reset / Expiry deletes your presence doc so matches disappear.
-- This build intentionally has **no service worker** to avoid sticky cache issues during iteration.

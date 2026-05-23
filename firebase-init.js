@@ -1,5 +1,4 @@
 // Firebase init for Pint-me
-// (This config is OK to be public in a web app; security comes from Firestore rules + Auth.)
 const firebaseConfig = {
   apiKey: "AIzaSyBDtf45OKxZIKUjv3ehbMBjpOMq1yVcKFs",
   authDomain: "pint-ping-b65ab.firebaseapp.com",
