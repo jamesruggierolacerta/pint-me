@@ -17,7 +17,7 @@
         <div class="logo" aria-hidden="true">🍺</div>
         <div>
           <div class="title">Pint-me</div>
-          <div class="subtitle">Time to kill... Pint Me.</div>
+          <div class="subtitle">Quick pint, zero broadcast.</div>
         </div>
       </div>
       <div class="chip" id="topStatusChip">OFF</div>
@@ -32,7 +32,9 @@
         <div class="cardhead">
           <div>
             <div class="cardtitle">I’m up for a pint</div>
-            <div id="pintHelp" class="cardsub">Fill in the fields and set your location to enable ON.</div>
+            <div id="pintHelp" class="cardsub">
+              Fill Group + Name + Time + Radius. Turning ON will ask for location and publish you.
+            </div>
           </div>
 
           <label class="switch" aria-label="Toggle pint mode">
@@ -53,6 +55,7 @@
           </label>
         </div>
 
+        <!-- Time + Radius side-by-side -->
         <div class="grid2">
           <label>
             Time window
@@ -75,10 +78,6 @@
           </label>
         </div>
 
-        <div class="actions single">
-          <button id="getLocation" class="btn">📍 Set my location (required)</button>
-        </div>
-
         <div class="meta">
           <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
           <div class="metaRow"><span>Status expiry</span><span id="expiresText" class="mono">—</span></div>
@@ -99,7 +98,7 @@
         <div id="matchesEmpty" class="empty">No matches yet.</div>
         <ul id="matchesList" class="list"></ul>
 
-        <div class="footerNote">Version: combined-top-v1 • toggle-to-publish • location-required • no-sw</div>
+        <div class="footerNote">Version: combined-top-v2 • toggle-asks-location • no-sw</div>
       </section>
 
       <!-- Meet here (optional) BELOW matches -->
@@ -131,7 +130,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-  <!-- Your firebase config -->
+  <!-- Your firebase config (must set window.fb = { auth, db }) -->
   <script src="firebase-init.js"></script>
 
   <!-- App -->
