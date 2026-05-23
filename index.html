@@ -17,7 +17,7 @@
         <div class="logo" aria-hidden="true">🍺</div>
         <div>
           <div class="title">Pint-me</div>
-          <div class="subtitle">Time to kill... Pint me.</div>
+          <div class="subtitle">Time to kill... Pint Me.</div>
         </div>
       </div>
       <div class="chip" id="topStatusChip">OFF</div>
@@ -27,14 +27,18 @@
 
     <main class="content">
 
-      <!-- 1) Identity + group + REQUIRED location -->
+      <!-- TOP: Combined “I'm up for a pint” block -->
       <section class="card">
         <div class="cardhead">
           <div>
-            <div class="cardtitle">Setup</div>
-            <div class="cardsub">Group + name + location are required before you can go ON.</div>
+            <div class="cardtitle">I’m up for a pint</div>
+            <div id="pintHelp" class="cardsub">Fill in the fields and set your location to enable ON.</div>
           </div>
-          <div class="chip" id="groupChip">cominghome</div>
+
+          <label class="switch" aria-label="Toggle pint mode">
+            <input id="toggleOn" type="checkbox" disabled />
+            <span class="slider"></span>
+          </label>
         </div>
 
         <div class="grid2">
@@ -42,36 +46,10 @@
             Group code
             <input id="groupCode" placeholder="e.g. cominghome" />
           </label>
+
           <label>
-            Display name
+            Name
             <input id="displayName" placeholder="e.g. James" />
-          </label>
-        </div>
-
-        <div class="actions single">
-          <button id="getLocation" class="btn">📍 Set my location (required)</button>
-        </div>
-
-        <div class="meta">
-          <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
-        </div>
-
-        <label class="check">
-          <input id="showAllInGroup" type="checkbox" />
-          <span>Show all ON in group (ignore radius)</span>
-        </label>
-      </section>
-
-      <!-- 2) Pint section: duration, radius, then toggle publishes -->
-      <section class="card">
-        <div class="cardhead">
-          <div>
-            <div class="cardtitle">I’m up for a pint</div>
-            <div id="pintHelp" class="cardsub">Complete setup above, then switch ON to publish.</div>
-          </div>
-          <label class="switch" aria-label="Toggle pint mode">
-            <input id="toggleOn" type="checkbox" disabled />
-            <span class="slider"></span>
           </label>
         </div>
 
@@ -97,18 +75,23 @@
           </label>
         </div>
 
+        <div class="actions single">
+          <button id="getLocation" class="btn">📍 Set my location (required)</button>
+        </div>
+
         <div class="meta">
+          <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
           <div class="metaRow"><span>Status expiry</span><span id="expiresText" class="mono">—</span></div>
           <div class="metaRow"><span>Last sync</span><span id="saved" class="mono">never</span></div>
         </div>
       </section>
 
-      <!-- 3) Matches -->
+      <!-- Matches -->
       <section class="card">
         <div class="cardhead">
           <div>
             <div class="cardtitle">Matches</div>
-            <div id="matchSummary" class="cardsub">Turn ON to see who’s up for one.</div>
+            <div id="matchSummary" class="cardsub">Turn ON to see who’s up for one nearby.</div>
           </div>
           <div class="chip" id="matchCount">0</div>
         </div>
@@ -116,31 +99,26 @@
         <div id="matchesEmpty" class="empty">No matches yet.</div>
         <ul id="matchesList" class="list"></ul>
 
-        <div class="footerActions">
-          <button id="share" class="btn">↗️ Share invite</button>
-          <button id="reset" class="btn danger">🧹 Reset</button>
-        </div>
-
-        <div class="footerNote">Version: layout-v3 • location-required • toggle-to-publish • no-sw</div>
+        <div class="footerNote">Version: combined-top-v1 • toggle-to-publish • location-required • no-sw</div>
       </section>
 
-      <!-- 4) Meet here (optional) BELOW matches -->
+      <!-- Meet here (optional) BELOW matches -->
       <section class="card">
         <div class="cardhead">
           <div>
             <div class="cardtitle">Meet here (optional)</div>
-            <div class="cardsub">Post a pin while you’re ON.</div>
+            <div class="cardsub">Post a pin to the group while you’re ON.</div>
           </div>
           <div class="pill"><span class="dot" id="meetDot"></span><span id="meetStatus">Not set</span></div>
         </div>
 
         <label>
           Venue name (optional)
-          <input id="venueName" placeholder="e.g. Rooftop Bar" />
+          <input id="venueName" placeholder="e.g. The Old Crown" />
         </label>
 
         <div class="actions">
-          <button id="meetHere" class="btn primary">📌 Meet here</button>
+          <button id="meetHere" class="btn primary">📌 Post meet pin</button>
           <button id="clearMeet" class="btn">Clear</button>
         </div>
       </section>
@@ -148,11 +126,15 @@
     </main>
   </div>
 
+  <!-- Firebase (load these BEFORE app.js) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+  <!-- Your firebase config -->
   <script src="firebase-init.js"></script>
+
+  <!-- App -->
   <script src="app.js"></script>
 </body>
 </html>
