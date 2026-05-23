@@ -79,7 +79,13 @@
         </div>
 
         <div class="meta">
-          <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
+          <div id="locRow" class="metaRow tappable" role="button" tabindex="0" aria-label="Refresh location">
+  <span>Location</span>
+  <span class="mono">
+    <span id="loc">not set</span>
+    <span class="muted" style="margin-left:8px;font-size:11px;">tap to refresh</span>
+  </span>
+</div>
           <div class="metaRow"><span>Status expiry</span><span id="expiresText" class="mono">—</span></div>
           <div class="metaRow"><span>Last sync</span><span id="saved" class="mono">never</span></div>
         </div>
