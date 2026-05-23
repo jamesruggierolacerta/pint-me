@@ -1,16 +1,11 @@
-# Pint-me — Layout v2
+# Pint-me — Layout v3
 
-This layout matches your requested flow:
+Changes vs v2:
 
-1) Group code + Display name at the top
-2) Pint section (duration, radius, optional location)
-3) **No Save button**: the **toggle switch publishes** when required fields are filled
-4) Matches below
-
-### Notes
-- Location is optional. If you don't set it, you can still go ON, but distance filtering requires location.
-- Turning OFF deletes your presence doc immediately.
-- No service worker is included (avoids caching issues while iterating).
+- **Location is required** (you can’t go ON until location is set).
+- Toggle is the publish/unpublish action.
+- Meet here is optional and appears **below matches**.
+- No service worker (avoids caching problems while iterating).
 
 ## Firebase checklist
 - Enable Anonymous auth
@@ -27,3 +22,6 @@ service cloud.firestore {
   }
 }
 ```
+
+## Common reason location fails
+If the browser has blocked location permission for your site, re-enable it in browser settings.

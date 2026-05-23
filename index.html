@@ -27,12 +27,12 @@
 
     <main class="content">
 
-      <!-- 1) Identity + group first -->
+      <!-- 1) Identity + group + REQUIRED location -->
       <section class="card">
         <div class="cardhead">
           <div>
-            <div class="cardtitle">Your details</div>
-            <div class="cardsub">These are required before you can go ON.</div>
+            <div class="cardtitle">Setup</div>
+            <div class="cardsub">Group + name + location are required before you can go ON.</div>
           </div>
           <div class="chip" id="groupChip">cominghome</div>
         </div>
@@ -48,18 +48,26 @@
           </label>
         </div>
 
+        <div class="actions single">
+          <button id="getLocation" class="btn">📍 Set my location (required)</button>
+        </div>
+
+        <div class="meta">
+          <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
+        </div>
+
         <label class="check">
           <input id="showAllInGroup" type="checkbox" />
           <span>Show all ON in group (ignore radius)</span>
         </label>
       </section>
 
-      <!-- 2) Pint mode: duration, radius, optional location, then toggle ON -->
+      <!-- 2) Pint section: duration, radius, then toggle publishes -->
       <section class="card">
         <div class="cardhead">
           <div>
             <div class="cardtitle">I’m up for a pint</div>
-            <div id="pintHelp" class="cardsub">Fill required fields above, then switch ON.</div>
+            <div id="pintHelp" class="cardsub">Complete setup above, then switch ON to publish.</div>
           </div>
           <label class="switch" aria-label="Toggle pint mode">
             <input id="toggleOn" type="checkbox" disabled />
@@ -89,39 +97,13 @@
           </label>
         </div>
 
-        <div class="actions single">
-          <button id="getLocation" class="btn">📍 Set location (optional)</button>
-        </div>
-
         <div class="meta">
-          <div class="metaRow"><span>Location</span><span id="loc" class="mono">not set</span></div>
           <div class="metaRow"><span>Status expiry</span><span id="expiresText" class="mono">—</span></div>
           <div class="metaRow"><span>Last sync</span><span id="saved" class="mono">never</span></div>
         </div>
       </section>
 
-      <!-- Meet here stays but now relies on being ON -->
-      <section class="card">
-        <div class="cardhead">
-          <div>
-            <div class="cardtitle">Meet here</div>
-            <div class="cardsub">Post a pin to the group while you’re ON.</div>
-          </div>
-          <div class="pill"><span class="dot" id="meetDot"></span><span id="meetStatus">Not set</span></div>
-        </div>
-
-        <label>
-          Venue name (optional)
-          <input id="venueName" placeholder="e.g. Rooftop Bar" />
-        </label>
-
-        <div class="actions">
-          <button id="meetHere" class="btn primary">📌 Meet here</button>
-          <button id="clearMeet" class="btn">Clear</button>
-        </div>
-      </section>
-
-      <!-- 3) Matches at bottom -->
+      <!-- 3) Matches -->
       <section class="card">
         <div class="cardhead">
           <div>
@@ -139,13 +121,33 @@
           <button id="reset" class="btn danger">🧹 Reset</button>
         </div>
 
-        <div class="footerNote">Version: layout-v2 • toggle-to-publish • no-sw</div>
+        <div class="footerNote">Version: layout-v3 • location-required • toggle-to-publish • no-sw</div>
+      </section>
+
+      <!-- 4) Meet here (optional) BELOW matches -->
+      <section class="card">
+        <div class="cardhead">
+          <div>
+            <div class="cardtitle">Meet here (optional)</div>
+            <div class="cardsub">Post a pin while you’re ON.</div>
+          </div>
+          <div class="pill"><span class="dot" id="meetDot"></span><span id="meetStatus">Not set</span></div>
+        </div>
+
+        <label>
+          Venue name (optional)
+          <input id="venueName" placeholder="e.g. Rooftop Bar" />
+        </label>
+
+        <div class="actions">
+          <button id="meetHere" class="btn primary">📌 Meet here</button>
+          <button id="clearMeet" class="btn">Clear</button>
+        </div>
       </section>
 
     </main>
   </div>
 
-  <!-- Firebase (load these BEFORE your app.js) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
